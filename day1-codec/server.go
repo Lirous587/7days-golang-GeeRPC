@@ -59,7 +59,7 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 	defer func() { _ = conn.Close() }()
 
 	var opt Option
-	// decode opt form conn 
+	// decode opt form conn
 	if err := json.NewDecoder(conn).Decode(&opt); err != nil {
 		log.Println("rpc server: options error: ", err)
 		return
@@ -83,16 +83,18 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 var invalidRequset = struct{}{}
 
 // serveCodec is the main loop for processing requests on a single connection.
-// It reads requests from the codec sequentially.
-// For each valid request,it launches a new goroutine to handle it concurrently.
-// It ensures that responses are witten back to the client sequentially using a mutex.
+// Handle requests concurrently.
+// Responses may be sent back out of order.The `sending` mutex ensures
+// that the write for a single response(Header and Body) is atomic.
+// This prevents the data from different responses from being interleaved on the wire.
+// On other words, the data must satisfy the consistency between header and body: h2 body2 | h1 body1 | h4 body4 | h3 body3 (there numerical order does not matter)
+// As for the client how to handle result? It need seq to ensure.
+// How should th e client handle the results? It needs a seq to ensure.
 // The loop continues until an unrecoverable error occurs or the client closes the connection.
 // serveCodec handles three steps
 // 1.Read the request
 // 2.Process the request
 // 3.Respond to the request
-// we need to know that we can handle multiple requests in a single connection
-// (in other words:multiple request headers and bodies)
 func (server *Server) serveCodec(cc codec.Codec) {
 	sending := new(sync.Mutex) // make sure to send a complete response
 	wg := new(sync.WaitGroup)  // wait until all request handled
@@ -109,8 +111,7 @@ func (server *Server) serveCodec(cc codec.Codec) {
 		}
 
 		wg.Add(1)
-		// concurrent execution of requests
-		// but we need ensure that responses are given one by one
+
 		go server.handleRequest(cc, req, sending, wg)
 	}
 	wg.Wait()
