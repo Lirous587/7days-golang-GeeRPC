@@ -80,7 +80,7 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 	server.serveCodec(f(conn))
 }
 
-var invalidRequset = struct{}{}
+var invalidRequest = struct{}{}
 
 // serveCodec is the main loop for processing requests on a single connection.
 // Handle requests concurrently.
@@ -105,8 +105,8 @@ func (server *Server) serveCodec(cc codec.Codec) {
 				break // it's not possible to recover,so close the connection. so cool
 			}
 			req.h.Error = err.Error()
-			// response invalidRequset
-			server.sendResponse(cc, req.h, invalidRequset, sending)
+			// response invalidRequest
+			server.sendResponse(cc, req.h, invalidRequest, sending)
 			continue
 		}
 
